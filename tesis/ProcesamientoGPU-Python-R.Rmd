@@ -14,7 +14,11 @@ library(reticulate)
 py_install("torch")
 py_install("numba")
 py_install("jit")
-py_install("cuda")
+py_install("joblib")
+py_install("pandas")
+py_install("requests")
+
+#py_install("cuda")
 py_config()
 ```
 
@@ -44,9 +48,63 @@ subprocess.check_call(['pip', 'install', 'numpy==2.0.2'])
 ```{python}
 
 meta_data = r.metadata_MGYS00005592
-
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(torch.cuda.is_available())
 ```
 
 ```{r}
-py_func(process_metadata())
+#library(reticulate)
+
+
+#py_func(process_metadata())$cuda()
+```
+
+```{python}
+import requests
+import pandas as pd
+import os
+
+class MgnifyClient:
+    def __init__(self, cache_dir='/tmp/MGnify_cache'):
+        self.base_url = "https://www.ebi.ac.uk/metagenomics/api/v1"
+        self.cache_dir = cache_dir
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+    
+    def _get(self, endpoint):
+        url = f"{self.base_url}/{endpoint}"
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    
+    def search_analysis(self, study_id):
+        endpoint = f"studies/{study_id}/analyses"
+        return self._get(endpoint)
+    
+    def get_metadata(self, analysis_accessions):
+        metadata = []
+        for accession in analysis_accessions:
+            # Inspecciona la respuesta para encontrar la estructura correcta
+            metadata_endpoint = f"analyses/{accession}"
+            analysis_data = self._get(metadata_endpoint)
+            
+            # Aquí puedes inspeccionar y ajustar según sea necesario
+            print(analysis_data)  # Inspecciona la estructura
+            
+            # Si encuentras la metadata en otro lugar, ajústalo aquí
+            # metadata.append(analysis_data.get('desired_field'))
+            
+        return pd.DataFrame(metadata)
+
+# Crear el cliente de MGnify
+mgclnt = MgnifyClient(cache_dir='/tmp/MGnify_cache')
+
+# Recuperar la lista de análisis asociados con el estudio MGYS00005592
+accession_list_response = mgclnt.search_analysis("MGYS00005592")
+accession_list = [analysis['id'] for analysis in accession_list_response['data']]
+
+# Inspeccionar la estructura de los análisis antes de intentar acceder a la metadata
+mgclnt.get_metadata(accession_list)
+
+
 ```
